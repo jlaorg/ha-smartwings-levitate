@@ -117,6 +117,10 @@ class LevitateBlindsCard extends HTMLElement {
     this.optimisticBottom = null;
     this.dragTopPos = null;
     this.dragBottomPos = null;
+    this.longPressTimer = null;
+    this.startY = 0;
+    this.startPointerId = null;
+    this.startTarget = null;
   }
 
   static getConfigElement() {
@@ -161,7 +165,7 @@ class LevitateBlindsCard extends HTMLElement {
           background: var(--secondary-background-color, #e0e0e0);
           border-radius: 8px;
           border: 2px solid var(--divider-color, #ccc);
-          touch-action: none;
+          touch-action: pan-y;
           overflow: visible;
         }
         .fabric {
@@ -196,7 +200,7 @@ class LevitateBlindsCard extends HTMLElement {
           justify-content: center;
           align-items: center;
           cursor: grab;
-          touch-action: none;
+          touch-action: pan-y;
           transition: top 0.3s ease;
         }
         .rail:active { cursor: grabbing; }
@@ -222,6 +226,8 @@ class LevitateBlindsCard extends HTMLElement {
           justify-content: center;
           align-items: center;
           pointer-events: none;
+          transform: scale(1);
+          transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .rail.ghost::after {
           content: '';
@@ -233,6 +239,9 @@ class LevitateBlindsCard extends HTMLElement {
         .container.dragging .rail,
         .container.dragging .fabric {
           transition: none !important;
+        }
+        .container.dragging .rail.ghost {
+          transform: scale(1.15);
         }
         .name {
           font-weight: 500;
@@ -275,25 +284,44 @@ class LevitateBlindsCard extends HTMLElement {
     this.errorMsg = this.shadowRoot.getElementById('error-msg');
 
     const handlePointerDown = (e, railType) => {
-      this.isDragging = true;
       this.activeRail = railType;
-      this.container.classList.add('dragging');
-      e.target.setPointerCapture(e.pointerId);
+      this.startY = e.clientY;
+      this.startPointerId = e.pointerId;
+      this.startTarget = e.target;
 
-      this.dragTopPos = this.currentTopPos;
-      this.dragBottomPos = this.currentBottomPos;
+      this.longPressTimer = setTimeout(() => {
+        this.isDragging = true;
+        this.longPressTimer = null;
+        this.container.classList.add('dragging');
+        try {
+          this.startTarget.setPointerCapture(this.startPointerId);
+        } catch (err) {}
 
-      // Show ghosts
-      this.fabricGhost.style.display = 'block';
-      if (railType === 'top') {
-        this.railGhostTop.style.display = 'flex';
-      } else {
-        this.railGhostBottom.style.display = 'flex';
-      }
-      this.updateGhostVisuals();
+        this.dragTopPos = this.currentTopPos;
+        this.dragBottomPos = this.currentBottomPos;
+
+        // Show ghosts
+        this.fabricGhost.style.display = 'block';
+        if (this.activeRail === 'top') {
+          this.railGhostTop.style.display = 'flex';
+        } else {
+          this.railGhostBottom.style.display = 'flex';
+        }
+        this.updateGhostVisuals();
+      }, 220); // Sweet spot long press duration for responsive but swipe-resilient activation
     };
 
     const handlePointerMove = (e) => {
+      if (this.longPressTimer) {
+        const dist = Math.abs(e.clientY - this.startY);
+        if (dist > 8) { // If they swipe more than 8px vertically, it is a page scroll
+          clearTimeout(this.longPressTimer);
+          this.longPressTimer = null;
+          this.activeRail = null;
+        }
+        return;
+      }
+      
       if (!this.isDragging || !this.activeRail) return;
       const rect = this.container.getBoundingClientRect();
       let y = e.clientY - rect.top;
@@ -320,10 +348,19 @@ class LevitateBlindsCard extends HTMLElement {
     };
 
     const handlePointerUp = (e) => {
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+        this.activeRail = null;
+        return;
+      }
+      
       if (!this.isDragging) return;
       this.isDragging = false;
       this.container.classList.remove('dragging');
-      e.target.releasePointerCapture(e.pointerId);
+      try {
+        this.startTarget.releasePointerCapture(this.startPointerId);
+      } catch (err) {}
 
       // Hide ghosts
       this.fabricGhost.style.display = 'none';
