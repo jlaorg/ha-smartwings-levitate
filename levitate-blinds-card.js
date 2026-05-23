@@ -480,11 +480,11 @@ class LevitateBlindsCard extends HTMLElement {
       minY = Math.min(topY, bottomY);
       maxY = Math.max(topY, bottomY);
     } else if (hasTop) {
-      minY = 0;
-      maxY = topY;
-    } else if (hasBottom) {
-      minY = bottomY;
+      minY = topY;
       maxY = 100;
+    } else if (hasBottom) {
+      minY = 0;
+      maxY = bottomY;
     }
 
     this.fabric.style.top = minY + "%";
@@ -530,11 +530,11 @@ class LevitateBlindsCard extends HTMLElement {
       minY = Math.min(topY, bottomY);
       maxY = Math.max(topY, bottomY);
     } else if (hasTop) {
-      minY = 0;
-      maxY = topY;
-    } else if (hasBottom) {
-      minY = bottomY;
+      minY = topY;
       maxY = 100;
+    } else if (hasBottom) {
+      minY = 0;
+      maxY = bottomY;
     }
 
     this.fabricGhost.style.top = minY + "%";
